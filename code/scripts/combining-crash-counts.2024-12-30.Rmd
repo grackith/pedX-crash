@@ -1,0 +1,85 @@
+---
+title: "combining-crash-counts.2024-12-30"
+author: "Grace Douglas"
+date: "2024-12-30"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(sf)
+library(dplyr)
+library(skimr)
+library(data.table)
+library(digest)
+library(naniar)
+```
+
+## 3 shapefiles to read in
+
+```{r}
+# Read in shapefiles with your paths
+int <- st_read("~/Library/CloudStorage/GoogleDrive-gad9515@nyu.edu/Shared drives/HumanFuel/1 NHTSA Ped Crash Sept 2023 /paper/code/crash-ml.2024-12-30.shp")
+even_crash <- st_read("~/Library/CloudStorage/GoogleDrive-gad9515@nyu.edu/Shared drives/HumanFuel/1 NHTSA Ped Crash Sept 2023 /paper/code/even-crash.2024-12.30.shp")
+odd_crash <- st_read("~/Library/CloudStorage/GoogleDrive-gad9515@nyu.edu/Shared drives/HumanFuel/1 NHTSA Ped Crash Sept 2023 /paper/code/odd-crash.2024-12-30.shp")
+
+# Convert to data frames/CSV format while preserving coordinates
+int_df <- int %>%
+  st_coordinates() %>%
+  as.data.frame() %>%
+  cbind(st_drop_geometry(int))
+
+int_df = int_df[-c(1:4, 8:26)]
+dt = int_df[!duplicated(lapply(int_df, digest))] # remove duplicated columns
+dt = dt[!duplicated(dt),] # remove duplicate rows
+
+
+even_crash_df <- even_crash %>%
+  st_coordinates() %>%
+  as.data.frame() %>%
+  cbind(st_drop_geometry(even_crash))
+
+even_crash_df = even_crash_df[-c(1:4)]
+even_crash_df = even_crash_df[!duplicated(lapply(even_crash_df, digest))] # remove duplicated columns
+even_crash_df = even_crash_df[!duplicated(even_crash_df),] # remove duplicate rows
+
+odd_crash_df <- odd_crash %>%
+  st_coordinates() %>%
+  as.data.frame() %>%
+  cbind(st_drop_geometry(odd_crash))
+
+odd_crash_df = odd_crash_df[-c(1:4)]
+odd_crash_df = odd_crash_df[!duplicated(lapply(odd_crash_df, digest))] # remove duplicated columns
+odd_crash_df = odd_crash_df[!duplicated(odd_crash_df),] # remove duplicate rows
+
+# Perform left joins
+dt <- dt %>%
+  left_join(even_crash_df) 
+
+dt = dt %>%
+  left_join(odd_crash_df)
+
+dt = dt[!duplicated(lapply(dt, digest))] # remove duplicated columns
+dt = dt[!duplicated(dt),] # remove duplicate rows
+dt = dt %>% dplyr::select(-ped_obs, -wb_pred, -field_1)
+
+
+dt = dt %>% mutate(crash = case_when(!is.na(MONTH) ~ 1,
+                                     .default = 0)) %>% dplyr::select(-CRASH_PED_)
+D = dt[-c(5:14,61,64:81)]
+str(D)
+
+D = D %>% filter(!is.na(log_exp))
+
+```
+
+
+```{r removing duplicates}
+write.csv(D, "/Users/gracedouglas/Library/CloudStorage/GoogleDrive-gad9515@nyu.edu/Shared drives/HumanFuel/1 NHTSA Ped Crash Sept 2023 /paper/code/crash-data-for-validation.2024-12-30.csv", row.names = FALSE)
+```
+
+```{r}
+
+```
+
+
